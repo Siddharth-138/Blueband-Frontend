@@ -348,14 +348,6 @@ function DashBoard() {
                       >
                         {/* Add your popup content here if needed */}
                       </Marker>
-                      <Polyline
-                        path={paths.get(car.carId) || []}
-                        options={{
-                          strokeColor: "#FF0000",
-                          strokeOpacity: 1.0,
-                          strokeWeight: 2
-                        }}
-                      />
                     </React.Fragment>
                   ))}
                 </GoogleMap>
