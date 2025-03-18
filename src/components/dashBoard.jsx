@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { GoogleMap, Marker, Polyline, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Marker, Polyline, useJsApiLoader, InfoWindow } from '@react-google-maps/api';
 import { Analytics } from '@vercel/analytics/next';
 import io from 'socket.io-client';
 import Image from 'next/image';
@@ -18,18 +18,22 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+// Update the RaceCar icon definition
 const RaceCar = {
   url: '/pin.png',
-  scaledSize: { width: 40, height: 40 },
+  scaledSize: { width: 20, height: 20 },
   origin: { x: 0, y: 0 },
-  anchor: { x: 19, y: 19 },
+  anchor: { x: 15, y: 15 }, // Center point of the icon (half width/height)
+  labelOrigin: { x: 15, y: -10 } // Position for label, centered horizontally above icon
 };
 
+// Update the SosIcon definition similarly
 const SosIcon = {
   url: '/sos.png',
   scaledSize: { width: 38, height: 38 },
   origin: { x: 0, y: 0 },
   anchor: { x: 19, y: 19 },
+  labelOrigin: { x: 19, y: -10 } // Center horizontally above icon
 };
 
 const audio = typeof window !== 'undefined' ? new Audio("alert.mp3") : null;
@@ -48,6 +52,8 @@ function DashBoard() {
   const [cars, setCars] = useState(new Map());
   const [mapCenter, setMapCenter] = useState({ lat: 11.10223, lng: 76.9659 });
   const [sosMessages, setSosMessages] = useState(new Map());
+  const [selectedCar, setSelectedCar] = useState(null);
+
   const [okMessages, setOkMessages] = useState(new Map());
   const [trackData, setTrackData] = useState([]);
   const [newTrackData, setNewTrackData] = useState({
@@ -94,6 +100,14 @@ function DashBoard() {
       newPaths.set(carId, [...carPath, position].slice(-100)); // Keep last 100 points
       return newPaths;
     });
+  };
+
+  const handleMarkerClick = (car) => {
+    setSelectedCar(car);
+  };
+  
+  const handleInfoWindowClose = () => {
+    setSelectedCar(null);
   };
 
   const updateCarStatus = useCallback((dataArray) => {
@@ -237,25 +251,27 @@ function DashBoard() {
     }));
   };
 
-  const AnimatedMarker = React.memo(({ position, carId }) => {
+  const AnimatedMarker = React.memo(({ position, carId, onClick }) => {
     const markerRef = useRef(null);
-
+  
     useEffect(() => {
       if (!markerRef.current && SlidingMarker) {
-        const newMarker = new SlidingMarker({
+        markerRef.current = new SlidingMarker({
           position,
           duration: 1000,
-          easing: 'easeOutQuad'
+          easing: 'easeOutQuad',
         });
-        markerRef.current = newMarker;
-        markersRef.current.set(carId, newMarker);
+  
+        markersRef.current.set(carId, markerRef.current);
+        markerRef.current.setMap(mapRef.current); // Attach to map
       } else if (markerRef.current) {
         markerRef.current.setPosition(position);
       }
     }, [position, carId, SlidingMarker]);
-
+  
     return null;
   });
+  
 
   const sortedCars = useMemo(() => Array.from(cars.values()).sort((a, b) => a.carId - b.carId), [cars]);
 
@@ -270,6 +286,24 @@ function DashBoard() {
         .hide-scrollbar {
           -ms-overflow-style: none;
           scrollbar-width: none;
+        }
+        .info-window {
+          padding: 8px;
+          background-color: white;
+          border-radius: 4px;
+          box-shadow: 0 2px 6px rgba(246, 232, 232, 0.3);
+        }
+        .car-label {
+          color: #ffffff;
+          background-color: rgb(232, 15, 15);
+          font-weight: bold;
+          padding: 2px 8px;
+          border-radius: 3px;
+          font-size: 12px;
+          border: 1px solid white;
+          white-space: nowrap;
+          text-align: center;
+          min-width: 20px;
         }
       `}</style>
 
@@ -335,20 +369,47 @@ function DashBoard() {
                   onLoad={(map) => {
                     mapRef.current = map;
                   }}
-                >
-                  {sortedCars.map((car) => (
-                    <React.Fragment key={car.carId}>
-                      <AnimatedMarker
-                        position={{ lat: car.latitude, lng: car.longitude }}
-                        carId={car.carId}
-                      />
-                      <Marker
-                        position={{ lat: car.latitude, lng: car.longitude }}
-                        icon={sosMessages.has(car.carId) ? SosIcon : RaceCar}
-                      >
-                        {/* Add your popup content here if needed */}
-                      </Marker>
-                    </React.Fragment>
+                >{sortedCars.map((car) => (
+                  <Marker
+                    key={car.carId}
+                    position={{ lat: car.latitude, lng: car.longitude }}
+                    icon={sosMessages.has(car.carId) ? SosIcon : RaceCar}
+                    onClick={() => handleMarkerClick(car)}
+                    label={{
+                      text: `${car.carId}`,
+                      className: "car-label",
+                      color: "#FFFFFF",
+                      fontWeight: "bold",
+                      fontSize: "12px"
+                    }}
+                  />
+                ))}
+                  
+                  {selectedCar && (
+                    <InfoWindow
+                      position={{ lat: selectedCar.latitude, lng: selectedCar.longitude }}
+                      onCloseClick={handleInfoWindowClose}
+                    >
+                      <div className="info-window">
+                        <h3 className="font-bold text-lg">Car {selectedCar.carId}</h3>
+                        <p><strong>Speed:</strong> {parseFloat(selectedCar.speed).toFixed(1)} kmph</p>
+                        <p><strong>Latitude:</strong> {parseFloat(selectedCar.latitude).toFixed(6)}</p>
+                        <p><strong>Longitude:</strong> {parseFloat(selectedCar.longitude).toFixed(6)}</p>
+                      </div>
+                    </InfoWindow>
+                  )}
+                  
+                  {/* Display paths for each car */}
+                  {Array.from(paths.entries()).map(([carId, path]) => (
+                    <Polyline
+                      key={`path-${carId}`}
+                      path={path}
+                      options={{
+                        strokeColor: "#FF0000",
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
+                      }}
+                    />
                   ))}
                 </GoogleMap>
               ) : (
@@ -356,9 +417,8 @@ function DashBoard() {
                   <h1>Tracking Not Enabled</h1>
                 </div>
               )}
-            </main>
-          </div>
-
+            </main> 
+          </div>        
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Add New Track</DialogTitle>
