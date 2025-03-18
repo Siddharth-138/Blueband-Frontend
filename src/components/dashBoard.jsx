@@ -20,8 +20,8 @@ import { Label } from "@/components/ui/label";
 
 // Update the RaceCar icon definition
 const RaceCar = {
-  url: '/pin.png',
-  scaledSize: { width: 40, height: 40 },
+  url: '/i.png',
+  scaledSize: { width: 25, height: 25 },
   origin: { x: 0, y: 0 },
   anchor: { x: 15, y: 15 }, // Center point of the icon (half width/height)
   labelOrigin: { x: 15, y: -10 } // Position for label, centered horizontally above icon
