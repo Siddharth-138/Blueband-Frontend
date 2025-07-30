@@ -147,9 +147,11 @@ function DashBoard() {
     };
     getTrackData();
 
-    const socket = io('https://geofence-backend-858481841309.asia-south1.run.app/');
+    const socket = io('https://srec-ev-tracker-backend.onrender.com/');
     //https://blueband-backend-577523927330.asia-south1.run.app/
     //https://blueband-backend-577523927330.asia-south1.run.app
+    //https://srec-ev-tracker-backend.onrender.com/
+    //https://geofence-backend-858481841309.asia-south1.run.app/
 
     socket.on('locationUpdate', updateCarData);
     socket.on('ok', updateCarStatus);
